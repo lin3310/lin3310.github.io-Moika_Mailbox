@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>If... — a DDLC fanfiction</title>
+  <style>
+    html,body{height:100%;margin:0;background:#1a0d08;color:#fff;font-family:Aller, sans-serif;}
+    #scene{position:relative;min-height:100vh;padding:24px;}
+    #mas-ui{position:fixed;bottom:18px;left:18px;display:flex;gap:12px;z-index:50;}
+    .menu-btn{background:#fff;padding:10px 14px;border-radius:6px;border:1.5px solid rgba(255,170,205,0.65);cursor:pointer;color:#5b2232;line-height:1.2;text-align:center;}
+    .menu-btn:hover{background:#ffd8eb;}
+    .layer{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);opacity:0;pointer-events:none;transition:opacity .2s;}
+    .layer.visible{opacity:1;pointer-events:all;}
+    .panel{background:#fff;border-radius:12px;width:min(920px,94%);max-height:86vh;overflow:hidden;box-shadow:0 28px 80px rgba(0,0,0,0.35);display:flex;flex-direction:column;}
+    .header{padding:18px 20px;border-bottom:1px solid #f1e3e8;background:linear-gradient(90deg,#fff,#ffeaf3);display:flex;justify-content:space-between;align-items:center;gap:16px;}
+    .header strong{font-family:'Libre Baskerville',serif;font-size:24px;color:#3a1e2e;}
+    .body{padding:18px;overflow:auto;flex:1;color:#4a2a38;line-height:1.7;}
+    .small{font-size:13px;color:#7a4c67;}
+    .back-btn,.btn-primary{border:none;border-radius:8px;padding:10px 14px;cursor:pointer;font-weight:700;}
+    .back-btn{background:#ffe3ef;color:#9f3f6b;}
+    .btn-primary{background:#ff7eb3;color:#fff;}
+    .repo-item{padding:12px 14px;border:1px solid #f3dce5;border-radius:10px;margin-bottom:10px;cursor:pointer;background:#fff;}
+    .repo-item:hover{background:#ffe5f1;}
+    .repo-meta{margin-top:6px;font-size:12px;color:#937182;}
+    .content-grid{display:grid;grid-template-columns:1fr 340px;gap:16px;margin-top:16px;}
+    .text-pane{background:#fff;border-radius:10px;padding:16px;max-height:56vh;overflow:auto;color:#3b2133;}
+    .player-pane{background:#fff;border-radius:10px;padding:16px;max-height:56vh;overflow:auto;color:#3b2133;}
+    iframe{width:100%;height:220px;border-radius:10px;border:1px solid #e7c7da;}
+    pre{white-space:pre-wrap;font-family:inherit;font-size:14px;line-height:1.7;}
+    @media(max-width:900px){.content-grid{grid-template-columns:1fr;}.player-pane{min-height:180px;}}
+  </style>
+</head>
+<body>
+  <div id="scene">
+    <h1 style="font-family:'Libre Baskerville',serif;font-size:3rem;color:#ffdede;">If... — a DDLC fanfiction</h1>
+    <p style="max-width:48ch;color:#f5d5df;margin-top:14px;">按鈕文字已更新：Talk 改為「這是什麼」，coming soon 改為「即將到來」。點一下「即將到來」，會打開第一層視窗；第一層呈現標題與說明，按下後可進入第二層，第二層會顯示文本內容與 YouTube 播放區。</p>
+  </div>
+  <div id="mas-ui">
+    <div class="menu-btn" id="btn-talk">這是什麼</div>
+    <div class="menu-btn" id="btn-music">Music</div>
+    <div class="menu-btn" id="btn-play">即將到來</div>
+  </div>
+  <div id="layer1" class="layer" aria-hidden="true">
+    <div class="panel" role="dialog" aria-modal="true">
+      <div class="header">
+        <strong>即將到來</strong>
+        <button class="back-btn" id="close-layer1">關閉</button>
+      </div>
+      <div class="body">
+        <p class="small">這是第一層視窗。向下滾動可查看倉庫中特定資料夾的檔案列表，點選項目後進入第二層。</p>
+        <div id="repo-list">載入中…</div>
+      </div>
+    </div>
+  </div>
+  <div id="layer2" class="layer" aria-hidden="true">
+    <div class="panel" role="dialog" aria-modal="true">
+      <div class="header">
+        <strong id="layer2-title">內文與播放器</strong>
+        <button class="back-btn" id="back-layer2">上一層</button>
+      </div>
+      <div class="body">
+        <p class="small">這是第二層視窗，會顯示選中的檔案內容與 YouTube 播放器（若檔案內含 YouTube 連結）。</p>
+        <div class="content-grid">
+          <div class="text-pane" id="content-text">請先在第一層選擇檔案。</div>
+          <div class="player-pane" id="content-player"><p class="small">若未找到 YouTube 影片，會顯示檔案文本。若有連結，則將嵌入播放器。</p><div id="yt-embed"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const githubOwner='lin3310';
+    const githubRepo='lin3310.github.io-Moika_Mailbox';
+    const githubFolder='';
+    const btnPlay=document.getElementById('btn-play');
+    const btnTalk=document.getElementById('btn-talk');
+    const layer1=document.getElementById('layer1');
+    const layer2=document.getElementById('layer2');
+    const repoList=document.getElementById('repo-list');
+    const closeLayer1=document.getElementById('close-layer1');
+    const backLayer2=document.getElementById('back-layer2');
+    const contentText=document.getElementById('content-text');
+    const ytEmbed=document.getElementById('yt-embed');
+    btnPlay.addEventListener('click', ()=>{layer1.classList.add('visible');layer1.setAttribute('aria-hidden','false');loadRepoFiles();});
+    closeLayer1.addEventListener('click', ()=>{layer1.classList.remove('visible');layer1.setAttribute('aria-hidden','true');});
+    backLayer2.addEventListener('click', ()=>{layer2.classList.remove('visible');layer2.setAttribute('aria-hidden','true');layer1.classList.add('visible');layer1.setAttribute('aria-hidden','false');});
+    btnTalk.addEventListener('click', ()=>{alert('這是什麼：這是一個簡單的 DDLC fanfiction 互動視窗示範。');});
+    async function loadRepoFiles(){
+      repoList.innerHTML='載入中…';
+      const apiUrl=`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${githubFolder}`;
+      try{
+        const res=await fetch(apiUrl);
+        if(!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+        const items=await res.json();
+        if(!Array.isArray(items)||items.length===0){repoList.innerHTML='<p class="small">此資料夾沒有可顯示的檔案。</p>';return;}
+        repoList.innerHTML='';
+        items.forEach(item=>{
+          const entry=document.createElement('div');
+          entry.className='repo-item';
+          entry.innerHTML=`<div>${item.name}</div><div class="repo-meta">${item.type} • ${item.size||0} bytes</div>`;
+          entry.addEventListener('click', ()=>openFileLayer2(item));
+          repoList.appendChild(entry);
+        });
+      }catch(err){repoList.innerHTML=`<p class="small">讀取失敗：${err.message}</p>`;}
+    }
+    async function openFileLayer2(item){
+      layer1.classList.remove('visible');layer1.setAttribute('aria-hidden','true');
+      layer2.classList.add('visible');layer2.setAttribute('aria-hidden','false');
+      document.getElementById('layer2-title').textContent=item.name;
+      contentText.textContent='載入內容中…';
+      ytEmbed.innerHTML='';
+      if(item.type !== 'file'){contentText.textContent='這不是可預覽檔案。';return;}
+      try{
+        const rawUrl=`https://raw.githubusercontent.com/${githubOwner}/${githubRepo}/main/${item.path}`;
+        const fileRes=await fetch(rawUrl);
+        if(!fileRes.ok) throw new Error(`${fileRes.status} ${fileRes.statusText}`);
+        const text=await fileRes.text();
+        const ytMatch=text.match(/(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?v=([\w-]{11})/);
+        const shortMatch=text.match(/(?:https?:\/\/)?youtu\.be\/([\w-]{11})/);
+        const videoId=(ytMatch&&ytMatch[1])||(shortMatch&&shortMatch[1]);
+        if(videoId){ytEmbed.innerHTML=`<iframe src="https://www.youtube.com/embed/${videoId}" allowfullscreen></iframe>`;} else {ytEmbed.innerHTML='';}
+        contentText.innerHTML=`<pre>${escapeHtml(text)}</pre>`;
+      }catch(err){contentText.textContent='載入失敗：'+err.message;}
+    }
+    function escapeHtml(str){return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  </script>
+</body>
+</html>
